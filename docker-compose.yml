@@ -1,0 +1,78 @@
+redis:
+  image: redis
+  ports:
+    - "6379:6379"
+  volumes:
+    - ./volumes/redis/lib:/var/lib/redis
+
+rabbitmq:
+  image: rabbitmq:3-management
+  ports:
+    - "5671:5671"
+    - "5672:5672"
+    - "15672:15672"
+  volumes:
+    - ./volumes/rabbitmq/rabbit.config:/etc/rabbitmq/rabbit.config
+    - ./volumes/rabbitmq/rabbitmq-env.conf:/etc/rabbitmq/rabbitmq-env.conf
+    - ./volumes/rabbitmq/logs:/var/log/rabbitmq
+    - ./volumes/ssl/server:/etc/rabbitmq/ssl
+  environment:
+    - RABBITMQ_CONFIG_FILE=/etc/rabbitmq/rabbit
+
+server:
+  image: stevenayers/sensu
+  ports:
+    - "4567:4567"
+  links:
+    - redis
+    - rabbitmq
+  volumes:
+    - ./volumes/server/conf.d:/etc/sensu/conf.d
+    - ./volumes/server/logs:/var/log/sensu
+    - ./volumes/ssl/client:/etc/sensu/ssl
+
+uchiwa:
+  image: uchiwa/uchiwa
+  ports:
+    - "3000:3000"
+  links:
+    - server
+  volumes:
+    - ./volumes/uchiwa/config.json:/config/config.json
+
+graphite:
+  image: nickstenning/graphite
+  restart: always
+  ports:
+    - "8080:80"
+    - "2003:2003"
+    - "2004:2004"
+    - "7002:7002"
+  volumes:
+    - ./volumes/graphite:/var/lib/graphite/storage/whisper
+
+grafana_mysql:
+  image: mysql
+  restart: always
+  ports:
+    - "3306:3306"
+  volumes:
+    - ./volumes/grafana/mysql:/var/lib/mysql
+  environment:
+    - MYSQL_ROOT_PASSWORD=secret
+
+grafana:
+  image: grafana/grafana
+  restart: always
+  ports:
+    - "3030:3000"
+  links:
+    - graphite
+    - grafana_mysql
+  volumes:
+   - ./volumes/grafana/grafana.ini:/etc/grafana/grafana.ini
+   - ./volumes/grafana/plugins:/var/lib/grafana/plugins
+   - ./volumes/grafana/logs:/var/log/grafana
+  environment:
+    - GF_SECURITY_ADMIN_PASSWORD=admin
+
